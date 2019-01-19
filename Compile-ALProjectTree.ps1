@@ -36,33 +36,61 @@ function Compile-ALProjectTree
         [Parameter(ValueFromPipelineByPropertyName=$True)]
         $CertPwd,
         $OrderedApps,
-        $PackagesPath
+        $PackagesPath,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        [String]$DockerHost,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        [PSCredential]$DockerHostCred,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        [bool]$DockerHostSSL,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $Password='',
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $Username=$env:USERNAME,
+        [ValidateSet('Windows', 'NavUserPassword')]
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $Auth='Windows'
+
     )
     if (-not $PackagesPath) {
         $PackagesPath = Get-Location
     }
     foreach ($App in $OrderedApps) {
         Write-Host "**** Compiling $($App.name) ****"
-        $ALC = (Get-ChildItem "C:\ProgramData\NavContainerHelper\Extensions\$ContainerName\" -Filter alc.exe -Recurse).FullName
-        Write-Host "Running $ALC for $($App.name)"
         $AppPath = Split-Path -Path $App.AppPath
-        Push-Location
-        Set-Location $AppPath
-        $escparser = '--%'
-        $AppFileName = "$($App.publisher)_$($App.name)_$($App.version).app"
-        Write-Host "Generating $AppFileName..."
-        
-        & $ALC $escparser /project:.\ /packagecachepath:"$PackagesPath"  | Convert-ALCOutputToTFS
+        $AppFileName = (Join-Path $PackagesPath "$($App.publisher)_$($App.name)_$($App.version).app")
 
-        if ($CertPath) {
-            Write-Host "Signing the app..."
-            if ($CertPwd) {
-                SignTool sign /f $CertPath /p $CertPwd /t http://timestamp.verisign.com/scripts/timestamp.dll $AppFileName
+        if ($Auth -eq 'NavUserPassword') {
+            $PWord = ConvertTo-SecureString -String $Password -AsPlainText -Force
+            $User = $Username
+            $credentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User,$PWord
+            if ($env:TF_BUILD) {
+                Compile-AppInNavContainer -containerName $ContainerName -appProjectFolder $AppPath -appOutputFolder $PackagesPath -appSymbolsFolder $PackagesPath -AzureDevOps -credential $credentials| Out-Null
             } else {
-                SignTool sign /f $CertPath /t http://timestamp.verisign.com/scripts/timestamp.dll $AppFileName
+                Compile-AppInNavContainer -containerName $ContainerName -appProjectFolder $AppPath -appOutputFolder $PackagesPath -appSymbolsFolder $PackagesPath  -credential $credentials | Out-Null
+            }
+        } else {
+            if ($env:TF_BUILD) {
+                Compile-AppInNavContainer -containerName $ContainerName -appProjectFolder $AppPath -appOutputFolder $PackagesPath -appSymbolsFolder $PackagesPath -AzureDevOps | Out-Null
+            } else {
+                Compile-AppInNavContainer -containerName $ContainerName -appProjectFolder $AppPath -appOutputFolder $PackagesPath -appSymbolsFolder $PackagesPath | Out-Null
             }
         }
-        Copy-Item -Path $AppFileName -Destination $PackagesPath
-        Pop-Location
+
+        if ($CertPath) {
+            if ($CertPwd) {
+                Write-Host "Signing the app with $CertPath and password inside container..."
+                #& $SignTool sign /f $CertPath /p $CertPwd /t http://timestamp.verisign.com/scripts/timestamp.dll $AppFileName
+                Sign-NAVContainerApp -containerName $ContainerName -appFile $AppFileName -pfxFile $CertPath -pfxPassword (ConvertTo-SecureString -String $CertPwd -AsPlainText -Force)
+            } else {
+                if (Test-Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\SignTool.exe") {
+                    $SignTool = (get-item "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\SignTool.exe").FullName
+                } else {
+                    throw "Couldn't find SignTool.exe, please install Windows SDK from https://go.microsoft.com/fwlink/p/?LinkID=2023014"
+                }
+                Write-Host "Signing the app with $CertPath without password (account permissions inside certificate used)..."
+                & $SignTool sign /f $CertPath /t http://timestamp.verisign.com/scripts/timestamp.dll $AppFileName
+            }
+        }
     }
 }

@@ -18,6 +18,10 @@
     If set, the Test app package will be downloaded too
 .Parameter AlPackagesPath
     Path to store the app packages into
+.Parameter UseDefaultCred
+    Use default credentials when downloading the symbols
+.Parameter Force
+    Download the package even when already exists on disk
 #>
 function Download-ALSystemPackages
 {
@@ -30,8 +34,15 @@ function Download-ALSystemPackages
         $PlatformVersion,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
         $Password='Pass@word1',
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $Username=$env:USERNAME,
+        [ValidateSet('Windows', 'NavUserPassword')]
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $Auth='Windows',
         $IncludeTestModule=$False,
-        $AlPackagesPath
+        $AlPackagesPath,
+        [bool]$UseDefaultCred=$False,
+        [switch]$Force
     )
 
     function Get-AlSymbolFile {
@@ -49,32 +60,44 @@ function Download-ALSystemPackages
             [Parameter(Mandatory = $true)]
             [String] $Authentication='Windows',
             [Parameter(Mandatory = $true)] 
-            [pscredential] $Credential 
+            [pscredential] $Credential ,
+            [bool]$UseDefaultCred=$false,
+            [bool]$Force
         )
 
         $TargetFile = Join-Path -Path $DownloadFolder -ChildPath "$($Publisher)_$($AppName)_$($AppVersion).app"
 
-        if ($Authentication -eq 'NavUserPassword') {
-            $PasswordTemplate = "$($Credential.UserName):$($Credential.GetNetworkCredential().Password)"
-            $PasswordBytes = [System.Text.Encoding]::Default.GetBytes($PasswordTemplate)
-            $EncodedText = [Convert]::ToBase64String($PasswordBytes)
-            
-            $null = Invoke-RestMethod `
-                        -Method get `
-                        -Uri "http://$($ContainerName):7049/nav/dev/packages?publisher=$($Publisher)&appName=$($AppName)&versionText=$($AppVersion)&tenant=default" `
-                        -Headers @{ "Authorization" = "Basic $EncodedText"} `
-                        -OutFile $TargetFile `
-                        -TimeoutSec 600 -Verbose
-            
-        }  else {
-            $null = Invoke-RestMethod `
-                        -Method get `
-                        -Uri "http://$($ContainerName):7049/nav/dev/packages?publisher=$($Publisher)&appName=$($AppName)&versionText=$($AppVersion)&tenant=default" `
-                        -Credential $Credential `
-                        -OutFile $TargetFile `
-                        -TimeoutSec 600 -Verbose
+        if ($Force -or (-not (Test-path $TargetFile))) {
+            if ($Authentication -eq 'NavUserPassword') {
+                $PasswordTemplate = "$($Credential.UserName):$($Credential.GetNetworkCredential().Password)"
+                $PasswordBytes = [System.Text.Encoding]::Default.GetBytes($PasswordTemplate)
+                $EncodedText = [Convert]::ToBase64String($PasswordBytes)
+                
+                $null = Invoke-RestMethod `
+                            -Method get `
+                            -Uri "http://$($ContainerName):7049/nav/dev/packages?publisher=$($Publisher)&appName=$($AppName)&versionText=$($AppVersion)&tenant=default" `
+                            -Headers @{ "Authorization" = "Basic $EncodedText"} `
+                            -OutFile $TargetFile `
+                            -TimeoutSec 600 -Verbose
+                
+            }  else {
+                if ($UseDefaultCred) {
+                    $null = Invoke-RestMethod `
+                            -Method get `
+                            -Uri "http://$($ContainerName):7049/nav/dev/packages?publisher=$($Publisher)&appName=$($AppName)&versionText=$($AppVersion)&tenant=default" `
+                            -UseDefaultCredentials `
+                            -OutFile $TargetFile `
+                            -TimeoutSec 600 -Verbose
+                } else {
+                    $null = Invoke-RestMethod `
+                            -Method get `
+                            -Uri "http://$($ContainerName):7049/nav/dev/packages?publisher=$($Publisher)&appName=$($AppName)&versionText=$($AppVersion)&tenant=default" `
+                            -Credential $Credential `
+                            -OutFile $TargetFile `
+                            -TimeoutSec 600 -Verbose
+                }
+            }
         }
-
         Get-Item $TargetFile
     }
 
@@ -87,33 +110,45 @@ function Download-ALSystemPackages
         mkdir $alpackages | out-null
     }
 
-    if ($Build -eq '') {
-        $credentials = Get-Credential -Message "Enter your WINDOWS password!!!" -UserName $env:USERNAME
-    } else {
+    if ($UseDefaultCred) {
         $PWord = ConvertTo-SecureString -String $Password -AsPlainText -Force
-        $User = $env:USERNAME
+        $User = $Username
         $credentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User,$PWord
+    } else {
+        if ($Build -eq '') {
+            $credentials = Get-Credential -Message "Enter your WINDOWS password!!!" -UserName $Username
+        } else {
+            $PWord = ConvertTo-SecureString -String $Password -AsPlainText -Force
+            $User = $Username
+            $credentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User,$PWord
+        }
     }
     Get-AlSymbolFile `
         -AppName 'Application' `
         -AppVersion $PlatformVersion `
         -DownloadFolder $alpackages `
-        -Authentication 'Windows' `
-        -Credential $credentials   
+        -Authentication $Auth `
+        -Credential $credentials `
+        -UseDefaultCred $UseDefaultCred `
+        -Force $Force
 
     Get-AlSymbolFile `
         -AppName 'System' `
         -AppVersion $PlatformVersion `
         -DownloadFolder $alpackages `
-        -Authentication 'Windows' `
-        -Credential $credentials  
+        -Authentication $Auth `
+        -Credential $credentials `
+        -UseDefaultCred $UseDefaultCred `
+        -Force $Force
 
     if ($IncludeTestModule) {
         Get-AlSymbolFile `
         -AppName 'Test' `
         -AppVersion $PlatformVersion `
         -DownloadFolder $alpackages `
-        -Authentication 'Windows' `
-        -Credential $credentials  
+        -Authentication $Auth `
+        -Credential $credentials `
+        -UseDefaultCred $UseDefaultCred `
+        -Force $Force
     }
 }

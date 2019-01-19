@@ -6,8 +6,14 @@
 .EXAMPLE
     PS C:\> Get-ALAppOrder -Path .\
     Read all app.json from the subfolders and sort the app objects
+.Parameter ContainerName
+    Name of the container to use to get info from .App file
 .Parameter Path
-    Folder in whcih the app.json will be searched. If no app.json is found, all *.app packages will be used.
+    Folder in which the app.json will be searched. If no app.json is found, all *.app packages will be used.
+.Parameter Recurse
+    Will search for files recursively
+.Parameter AppCollection
+    Array of app.json files you want to compile.
 .OUTPUTS
     Array of App objects having these members:
         name
@@ -22,10 +28,20 @@
 #>
 function Get-ALAppOrder
 {
+    [CMDLetBinding(DefaultParameterSetName="Path")]
     Param(
+
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $ContainerName,
         #Path to the repository
-        $Path='.\'
+        [Parameter(ParameterSetName="Path")]
+        $Path='.\',
+        [switch]$Recurse,
+        #Array of Files you want to use
+        [Parameter(ValueFromPipelineByPropertyName=$True,ParameterSetName="Collection")]
+        [Hashtable]$AppCollection
     )
+
     function ConvertTo-ALAppsInfo
     {
         Param(
@@ -39,6 +55,7 @@ function Get-ALAppOrder
         }
         return $result
     }
+
     function Get-ALBuildOrder
     {
         Param(
@@ -58,7 +75,7 @@ function Get-ALAppOrder
                             $NewApp | Add-Member -MemberType NoteProperty -Name 'name' -Value $Dependency.name
                             $NewApp | Add-Member -MemberType NoteProperty -Name 'version' -Value $Dependency.version
                             $NewApp | Add-Member -MemberType NoteProperty -Name 'AppPath' -Value ""
-                            
+
                             if (-not $AppsCompiled.ContainsKey($Dependency.name)) {
                                 $AppsCompiled.Add($Dependency.name,$NewApp)
                                 $AppsToAdd.Add($Dependency.name,$NewApp)
@@ -82,17 +99,19 @@ function Get-ALAppOrder
         } while ($Apps.Count -ne $AppsCompiled.Count)
         return $AppsOrdered
     }
+
     function Get-AppJsonFromApp
     {
         Param(
-            $AppFile
+            $AppFile,
+            $ContainerName
         )
-        $AppInfo = Get-NAVAppInfo -Path $AppFile
+        $AppDeps = @()
+        $AppInfo = Get-NavContainerAppInfoFile -AppPath $AppFile -ContainerName $ContainerName
         $AppJson = New-Object -TypeName PSObject
         $AppJson | Add-Member -MemberType NoteProperty -Name "name" -Value $AppInfo.Name
         $AppJson | Add-Member -MemberType NoteProperty -Name "publisher" -Value $AppInfo.Publisher
         $AppJson | Add-Member -MemberType NoteProperty -Name "version" -Value $AppInfo.Version
-        $AppDeps = @()
         foreach ($AppDep in $AppInfo.Dependencies) {
             $AppDepJson = New-Object -TypeName PSObject
             $AppDepJson | Add-Member -MemberType NoteProperty -Name "name" -Value $AppDep.Name
@@ -105,20 +124,26 @@ function Get-ALAppOrder
         return $AppJson
     }
 
-    $AppConfigs = Get-ChildItem -Path $Path -Filter App.json -Recurse
-    if ($AppConfigs) {
+    if($AppCollection) {
+        $Apps = $AppCollection
+    }
+    else {
+        $AppConfigs = Get-ChildItem -Path $Path -Filter App.json -Recurse
         $Apps = ConvertTo-ALAppsInfo -Files $AppConfigs
-    } else {
+    }
+
+    if(-not $Apps) {
         $Apps = @{}
-        $AppFiles = Get-ChildItem -Path $Path -Filter *.app
+        $AppFiles = Get-ChildItem -Path $Path -Filter *.app -Recurse:$Recurse
         foreach ($AppFile in $AppFiles) {
             #$App = Get-NAVAppInfo -Path $AppFile.FullName
-            $App = Get-AppJsonFromApp -AppFile $AppFile.FullName
+            $App = Get-AppJsonFromApp -AppFile $AppFile.FullName -ContainerName $ContainerName
             if ($App.publisher -ne 'Microsoft') {
                 $Apps.Add($App.name,$App)
             }
         }
     }
+
     $AppsOrdered = Get-ALBuildOrder -Apps $Apps
     Write-Output $AppsOrdered
 }
