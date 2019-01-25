@@ -87,7 +87,7 @@ AliasesToExport = '*'
 # FileList = @()
 
 # Version number of this module.
-ModuleVersion = '0.9.47'
+ModuleVersion = '0.9.52'
 
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
@@ -109,6 +109,20 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+0.9.52
+- Added support for downloading missing dependencies when publishing app tree through using AppDownloadScript parameter
+
+0.9.51
+- Added support for downloading missing dependencies when compiling app tree through using AppDownloadScript parameter
+- Fixed bug when Test webservices were published even when test toolkit was not imported (thus objects published are not present)
+
+0.9.50
+- Fixed Nuget package creation when App name has spaces
+- Added webservice for Automated tests into creating the environment (before the test app must register the webservices)
+
+0.9.48..0.9.49
+- Fixed Get-ALAppOrder bug when no AppCollection passed and no app.json exists
+
 0.9.47        
 - Fixed Get-ALAppOrder bug with default parameter set
 - Added possibility to pass password and RAM through pipeline
