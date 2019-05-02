@@ -55,7 +55,12 @@ function Init-ALEnvironment
         [bool]$DockerHostSSL,
         [switch]$SkipImportTestSuite,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
-        $optionalParameters
+        $optionalParameters,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $EnableSymbolLoading=$true,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $CreateTestWebServices=$true
+
     )
     if ($env:TF_BUILD) {
         Write-Host "TF_BUILD set, running under agent, enforcing Build flag"
@@ -96,7 +101,7 @@ function Init-ALEnvironment
                         -licenseFile $LicenseFile `
                         -Credential $credentials `
                         -doNotExportObjectsToText `
-                        -enableSymbolLoading `
+                        -enableSymbolLoading:$EnableSymbolLoading `
                         -includeCSide `
                         -alwaysPull `
                         -includeTestToolkit:$inclTestToolkit `
@@ -122,9 +127,7 @@ function Init-ALEnvironment
 
         $additionalParameters = @("--volume ""$($RepoPath):C:\app""",
             '-e CustomNavSettings=ServicesUseNTLMAuthentication=true',
-            '-e usessl=N',
-            '-e webclient=N',
-            '-e httpsite=N'
+            '-e usessl=N'
         )
         if($optionalParameters) {
             $additionalParameters += $optionalParameters
@@ -137,7 +140,7 @@ function Init-ALEnvironment
             -licenseFile $LicenseFile `
             -Credential $credentials `
             -auth $Auth `
-            -enableSymbolLoading `
+            -enableSymbolLoading:$EnableSymbolLoading `
             -doNotExportObjectsToText `
             -includeCSide `
             -alwaysPull `
@@ -154,18 +157,17 @@ function Init-ALEnvironment
     }
 
     if ($Build -eq '') {
-    Write-Host 'Extracting VSIX'
-    docker exec -t $ContainerName PowerShell.exe -Command {$targetDir = "c:\run\my\alc"; $vsix = (Get-ChildItem "c:\run\*.vsix" -Recurse | Select-Object -First 1);Add-Type -AssemblyName System.IO.Compression.FileSystem;[System.IO.Compression.ZipFile]::ExtractToDirectory($vsix.FullName, $targetDir) ;Write-Host "$vsix";copy-item $vsix "c:\run\my"}
+        Write-Host 'Extracting VSIX'
+        docker exec -t $ContainerName PowerShell.exe -Command {$targetDir = "c:\run\my\alc"; $vsix = (Get-ChildItem "c:\run\*.vsix" -Recurse | Select-Object -First 1);Add-Type -AssemblyName System.IO.Compression.FileSystem;[System.IO.Compression.ZipFile]::ExtractToDirectory($vsix.FullName, $targetDir) ;Write-Host "$vsix";copy-item $vsix "c:\run\my"}
 
-    $vsixExt = (Get-ChildItem "C:\ProgramData\NavContainerHelper\Extensions\$ContainerName\" -Filter *.vsix).FullName
+        $vsixExt = (Get-ChildItem "C:\ProgramData\NavContainerHelper\Extensions\$ContainerName\" -Filter *.vsix).FullName
         Write-Host 'Installing vsix package'
         code --install-extension $vsixExt
     }
     
-    if ($inclTestToolkit) {
+    if ($inclTestToolkit -and $CreateTestWebServices) {
         Write-Host 'Publishing CALTestResult (PAG130405) and CALCodeCoverageMap (PAG130408) Webservices'
-        $session = Get-NavContainerSession -containerName $ContainerName -silent
-        Invoke-Command -Session $session -ScriptBlock {
+        Invoke-ScriptInNavContainer -containerName $ContainerName -scriptblock {
             New-NAVWebService  -ServerInstance NAV -ServiceName CALTestResults -ObjectType Page -ObjectId 130405 -Published $True
             New-NAVWebService  -ServerInstance NAV -ServiceName CALCodeCoverageMap -ObjectType Page -ObjectId 130408 -Published $True 
         }

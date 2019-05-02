@@ -10,23 +10,25 @@ function Read-ALConfiguration
         $Username=$env:USERNAME,
         [ValidateSet('Windows', 'NavUserPassword')]
         $Auth='Windows',
-        [hashtable]$PathMap,
-        [String]$PathMapString,
-        [String]$DockerHost,
-        [PSCredential]$DockerHostCred,
-        [bool]$DockerHostSSL
+        $Profile='default',
+        $SettingsFileName='',
+        $ExcludePath='*\Dependencies\*'
+
     )
-    if ($PathMapString -and (-not $PathMap)) {
-        $PathMap = @{
-            "$($PathMapString.Split(';')[0])" = "$($PathMapString.Split(';')[1])"
-        }
-        write-host "Path map $PathMap"
-    }
     $SettingsScript = (Join-Path $Path 'Scripts\Settings.ps1')
     if (Test-Path $SettingsScript) {
         Write-Host "Running $SettingsScript ..."
         . (Join-Path $Path 'Scripts\Settings.ps1')
     }
+    Read-ALJsonConfiguration -Path $Path -SettingsFileName $SettingsFileName -Profile $Profile -ExcludePath $ExcludePath
+
+    if ($EnableSymbolLoading -eq $null) {
+        $EnableSymbolLoading = $true
+    }
+    if ($CreateTestWebServices -eq $null) {
+        $CreateTestWebServices = $true
+    }
+
     $ClientPath = Get-ALDesktopClientPath -ContainerName $ContainerName
     $Configuration = Get-ALConfiguration `
                             -ContainerName $ContainerName `
@@ -53,10 +55,9 @@ function Read-ALConfiguration
                             -Auth $Auth `
                             -Username $Username `
                             -RAM $RAM `
-                            -DockerHost $DockerHost `
-                            -DockerHostSSL $DockerHostSSL `
-                            -DockerHostCred $DockerHostCred `
-                            -optionalParameters $optionalParameters
+                            -optionalParameters $optionalParameters `
+                            -EnableSymbolLoading $EnableSymbolLoading `
+                            -CreateTestWebServices $CreateTestWebServices
 
     Write-Output $Configuration
 }
