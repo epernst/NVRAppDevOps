@@ -34,6 +34,9 @@ function Init-ALEnvironment
         $ImageName,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
         $LicenseFile,
+        [ValidateSet('','process','hyperv')]
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $Isolation,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
         $Build='',
         [Parameter(ValueFromPipelineByPropertyName=$True)]
@@ -59,8 +62,11 @@ function Init-ALEnvironment
         [Parameter(ValueFromPipelineByPropertyName=$True)]
         $EnableSymbolLoading=$true,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
-        $CreateTestWebServices=$true
-
+        $CreateTestWebServices=$true,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $customScripts,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
+        $useSSL
     )
     if ($env:TF_BUILD) {
         Write-Host "TF_BUILD set, running under agent, enforcing Build flag"
@@ -85,11 +91,21 @@ function Init-ALEnvironment
                 $credentials = Get-Credential -Message "Enter password you want to use" -UserName $Username
             }
         }
+
         $myscripts = @(@{'MainLoop.ps1' = 'while ($true) { start-sleep -seconds 10 }'})
+
+        if($customScripts) {
+            $myscripts += $customScripts
+        }
 
         $additionalParameters = @("--volume ""$($RepoPath):C:\app""",
             '-e CustomNavSettings=ServicesUseNTLMAuthentication=true'
         )
+
+        if($useSSL -eq 'true') {
+            $additionalParameters += "--env useSSL=Y"
+        }
+
         if($optionalParameters) {
             $additionalParameters += $optionalParameters
         }
@@ -99,6 +115,7 @@ function Init-ALEnvironment
                         -containerName $ContainerName `
                         -imageName $ImageName `
                         -licenseFile $LicenseFile `
+                        -isolation $Isolation `
                         -Credential $credentials `
                         -doNotExportObjectsToText `
                         -enableSymbolLoading:$EnableSymbolLoading `
@@ -119,16 +136,29 @@ function Init-ALEnvironment
             Write-Host 'Using fixed password and NavUserPassword authentication'
             $PWord = ConvertTo-SecureString -String 'Pass@word1' -AsPlainText -Force
         } else {
-            Write-Host "Using passed password and Windows authentication"
+            Write-Host "Using passed password and $Auth authentication"
             $PWord = ConvertTo-SecureString -String $Password -AsPlainText -Force
         }
         $User = $Username
         $credentials = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $User,$PWord
 
+        if($customScripts) {
+            $myscripts = @($customScripts)
+        } else {
+            $myscripts = @()
+        }
+
         $additionalParameters = @("--volume ""$($RepoPath):C:\app""",
-            '-e CustomNavSettings=ServicesUseNTLMAuthentication=true',
-            '-e usessl=N'
+            '-e CustomNavSettings=ServicesUseNTLMAuthentication=true'
         )
+
+        if($useSSL -eq 'true') {
+            $additionalParameters += "--env useSSL=Y"
+        }
+        else {
+            $additionalParameters += "--env useSSL=N"
+        }
+
         if($optionalParameters) {
             $additionalParameters += $optionalParameters
         }
@@ -138,6 +168,7 @@ function Init-ALEnvironment
             -containerName $ContainerName `
             -imageName $ImageName `
             -licenseFile $LicenseFile `
+            -isolation $Isolation `
             -Credential $credentials `
             -auth $Auth `
             -enableSymbolLoading:$EnableSymbolLoading `
@@ -150,7 +181,8 @@ function Init-ALEnvironment
             -assignPremiumPlan `
             -shortcuts "None" `
             -useBestContainerOS `
-            -updateHosts
+            -updateHosts `
+            -myScripts $myscripts
 
     #        -myScripts @{"SetupWebClient.ps1"=''}
     #    -memoryLimit 4GB

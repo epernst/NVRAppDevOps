@@ -28,13 +28,16 @@ function Read-ALConfiguration
     if ($CreateTestWebServices -eq $null) {
         $CreateTestWebServices = $true
     }
-
+    if ($Isolation -eq $null) {
+        $Isolation = ''
+    }
     $ClientPath = Get-ALDesktopClientPath -ContainerName $ContainerName
     $Configuration = Get-ALConfiguration `
                             -ContainerName $ContainerName `
                             -ImageName $ImageName `
                             -LicenseFile $LicenseFile `
                             -VsixPath $VsixPath `
+                            -Isolation $Isolation `
                             -PlatformVersion $AppJSON.platform `
                             -AppVersion $AppJSON.version `
                             -TestAppVersion $TestAppJSON.version `

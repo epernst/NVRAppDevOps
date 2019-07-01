@@ -48,7 +48,9 @@ Description = 'cmdlets for DevOps for Business Central'
 # ProcessorArchitecture = ''
 
 # Modules that must be imported into the global environment prior to importing this module
-RequiredModules = @('navcontainerhelper')
+RequiredModules = @(
+    @{ModuleName='navcontainerhelper';ModuleVersion='0.6.1.2';Guid='ae60837a-fa30-4e28-a5ef-b8cd4cf6640a'}
+    )
 
 # Assemblies that must be loaded prior to importing this module
 # RequiredAssemblies = @()
@@ -87,7 +89,7 @@ AliasesToExport = '*'
 # FileList = @()
 
 # Version number of this module.
-ModuleVersion = '0.9.62'
+ModuleVersion = '0.9.82'
 
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
@@ -109,6 +111,64 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+
+0.9.82
+- Add parameter to support ssl (thanks MaxBelohoubek)
+
+0.9.81
+- Add parameter to install latest nuget package version instead specific version
+
+0.9.80
+- Add key parameter to Download-ALAppFromNuget to pass the key for e.g. Azure DevOps Artifacts feed
+
+0.9.78
+- Add Source and SourceUrl to Download-ALAppFromNuget
+
+0.9.76
+- Fixed 'Illegal value in myScripts' error
+
+0.9.75
+- Added myScripts parameter to Init-ALEnvironment (thanks MaxBelohoubek)
+
+0.9.74
+- Added parameters to choose CodeCops on Compile-ALProjectTree (thanks MJECloud)
+- Small fixes of messages
+- Change of dependency name format in New-ALNuSpec - by default set to $($Dep.publisher)_$($Dep.name) but could be changed by parameter
+
+0.9.73
+- Added DependencyFormat to New-ALNuSpec which by default format the dependencies in format Publisher_AppName
+
+0.9.72
+- Fixed SkipVerification flag error "Cannot process argument transformation on parameter 'skipVerification'. Cannot convert value"
+
+0.9.71
+- Fixed bug when Azure DevOps build no. was not updated in Set-ALAppBuildNo
+
+0.9.70
+- Add parameters useDevEndpoint and tenant and ForceSync mode to Publish-ALAppTree
+
+0.9.69
+- Set-ALAppBuildNo extended with new parameters and return the version as a result
+
+0.9.68
+- Isolation parameter is null fixed
+
+0.9.67
+- Fixed Isolation parameter
+
+0.9.66
+- Fixed usage of isolation during Build processes
+- Add WaitForResult switch to Upload-PerTenantApp cmdlet to wait till the publishing is done
+
+0.9.65
+- Fixed usage of isolation during Build processes
+
+0.9.64
+- Added parameter Isolation to override the isolation level (e.g. when falling back to Hyper-V because differrent build no. of OS and container)
+
+0.9.63
+- Add Verbose to BCAPIData functions to show called URL
+        
 0.9.62
 - Add APIVersion into Upload-PerTenantApp function to support named sandboxes
 
