@@ -58,6 +58,8 @@ function Init-ALEnvironment
         [bool]$DockerHostSSL,
         [switch]$SkipImportTestSuite,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
+        [bool]$IncludeCSide=$true,
+        [Parameter(ValueFromPipelineByPropertyName=$True)]
         $optionalParameters,
         [Parameter(ValueFromPipelineByPropertyName=$True)]
         $EnableSymbolLoading=$true,
@@ -119,7 +121,7 @@ function Init-ALEnvironment
                         -Credential $credentials `
                         -doNotExportObjectsToText `
                         -enableSymbolLoading:$EnableSymbolLoading `
-                        -includeCSide `
+                        -includeCSide:$IncludeCSide `
                         -alwaysPull `
                         -includeTestToolkit:$inclTestToolkit `
                         -shortcuts "Desktop" `
@@ -173,7 +175,7 @@ function Init-ALEnvironment
             -auth $Auth `
             -enableSymbolLoading:$EnableSymbolLoading `
             -doNotExportObjectsToText `
-            -includeCSide `
+            -includeCSide:$IncludeCSide `
             -alwaysPull `
             -includeTestToolkit:$inclTestToolkit `
             -additionalParameters $additionalParameters `
@@ -199,9 +201,12 @@ function Init-ALEnvironment
     
     if ($inclTestToolkit -and $CreateTestWebServices) {
         Write-Host 'Publishing CALTestResult (PAG130405) and CALCodeCoverageMap (PAG130408) Webservices'
+
+        $ServerConfig = Get-NavContainerServerConfiguration -ContainerName $ContainerName
+
         Invoke-ScriptInNavContainer -containerName $ContainerName -scriptblock {
-            New-NAVWebService  -ServerInstance NAV -ServiceName CALTestResults -ObjectType Page -ObjectId 130405 -Published $True
-            New-NAVWebService  -ServerInstance NAV -ServiceName CALCodeCoverageMap -ObjectType Page -ObjectId 130408 -Published $True 
+            New-NAVWebService -ServerInstance $ServerConfig.ServerInstance -ServiceName CALTestResults -ObjectType Page -ObjectId 130405 -Published $True
+            New-NAVWebService -ServerInstance $ServerConfig.ServerInstance -ServiceName CALCodeCoverageMap -ObjectType Page -ObjectId 130408 -Published $True 
         }
     }
 }

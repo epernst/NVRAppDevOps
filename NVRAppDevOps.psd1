@@ -89,7 +89,7 @@ AliasesToExport = '*'
 # FileList = @()
 
 # Version number of this module.
-ModuleVersion = '0.9.82'
+ModuleVersion = '0.9.87'
 
 
 # Private data to pass to the module specified in RootModule/ModuleToProcess. This may also contain a PSData hashtable with additional module metadata used by PowerShell.
@@ -111,6 +111,20 @@ PrivateData = @{
 
         # ReleaseNotes of this module
         ReleaseNotes = @'
+0.9.87
+- Fix NuSpec creatinon for BC v15.x - now ignoring Microsoft dependencies
+
+0.9.86
+- Fixed Read-ALConfiguration ignoring Auth and other parameters from .json config
+
+0.9.85
+- Add support for different Instance Name than NAV (BC) (thanks kfuglsang)
+
+0.9.84
+- Add parameter IncludeCSide (true by default if not set) for using in Init-ALEnvironment for v15.x containers
+
+0.9.83
+- Fixes from kfuglsang around file path and company name in URL
 
 0.9.82
 - Add parameter to support ssl (thanks MaxBelohoubek)
